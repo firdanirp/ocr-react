@@ -4,6 +4,7 @@ import { RadioGroup, RadioButton } from 'react-radio-buttons';
 import ImageUploader from 'react-images-upload';
 import ReactiveButton from 'reactive-button'; 
 import Axios from 'axios';
+import { PdfUpload } from 'react-ipfs-uploader'
 import StatusAlert, { StatusAlertService } from 'react-status-alert';
 import 'react-status-alert/dist/status-alert.css'
 
@@ -11,41 +12,75 @@ class Upload extends React.Component{
   constructor(props){
     super(props);
     this.state = {
-      first:false,
+      first:undefined,
       second:false,
       btn:undefined,
       rad:undefined,
       file:undefined,
-      status:undefined
+      status:undefined,
+      pdfUrl:undefined
     }
+    this.radView = this.radView.bind(this);
+    this.fileUpload = this.fileUpload.bind(this);
+    this.pdfUpload = this.pdfUpload.bind(this);
+    this.firstBtnSelected = this.firstBtnSelected.bind(this);
+  }
+
+  firstBtnSelected(btn,first){
+    this.setState({
+      btn:btn,
+      first:first
+    })
   }
 
   render(){
     return(
     <div style={{textAlign: "center", margin:'30px'}}>
       <ReactiveButton
-        onClick={()=>{this.setState({btn:'Single'}); this.setState({first:true})}}
+        onClick={this.firstBtnSelected('Single','img')}
         idleText='Single Image'
         color='yellow'
         width='200px'
         style={{marginRight:20}}
       />
       <ReactiveButton 
-        onClick={()=>{this.setState({btn:'Multiple'}); this.setState({first:true})}}
+        onClick={()=>{this.setState({btn:'Multiple'}); this.setState({first:'img'})}}
         idleText='Multiple Image'
         color='blue'
         width='200px'
       />
-      {this.state.first === true && this.state.btn !== undefined && this.radView(this.state.btn) }
-      {this.state.first === true && this.state.second === true && this.fileUpload({second:this.state.second, btn:this.state.btn}) } 
+      <ReactiveButton 
+        onClick={()=>{this.setState({btn:'Pdf'}); this.setState({first:'pdf'})}}
+        idleText='Pdf'
+        color='blue'
+        width='200px'
+      />
+      {this.state.first === 'pdf' && this.pdfUpload} 
+      {this.state.first === 'img' && this.state.btn !== undefined && this.radView}
+      {this.state.first === 'img' && this.state.second === true && this.fileUpload({second:this.state.second, btn:this.state.btn}) } 
     </div>
     );
   }
 
-  radView(props){
+  pdfUpload(){
+    return(
+      <div>
+        <PdfUpload setUrl={this.setState({pdfUrl:'https://9zzdictnjb.execute-api.us-west-2.amazonaws.com/dev'})} />
+        Pdfurl :{this.pdfUrl}
+        <a href={this.state.pdfUrl} target="_blank" rel="noopener noreferrer">
+        {this.state.pdfUrl}
+      </a>
+    </div>
+      
+    );
+  }
+
+
+
+  radView(){
     return (
       <div>
-        <p>{props} Image Selected</p>
+        <p>{this.state.rad} Image Selected</p>
         <RadioGroup horizontal onChange={(event)=>{this.setState({rad:event}); this.setState({second:true})}} > 
           <RadioButton value="Form" style={{borderRadius:"30%"}}>Form</RadioButton>
           <RadioButton value="Table">Table</RadioButton>
@@ -68,9 +103,9 @@ class Upload extends React.Component{
           singleImage={isSingle(props.btn)} 
           withPreview={true}
           label="Maximum size file: 5MB"
-          buttonText='Choose an image'
+          buttonText='Choose pdf file'
           onChange={(event)=>{this.setState({file:event[0]});}}
-          imgExtension={['.jpeg','.jpg']}
+          imgExtension={['.jpg','.jpeg']}
           maxFileSize={5242880}></ImageUploader>
         <ReactiveButton
           buttonState='idle'
@@ -84,16 +119,16 @@ class Upload extends React.Component{
   }
 
 
-   async uploading(props){
+  async uploading(props){
     try {
       // console.log(props)
       const nameFile = props.file.name; 
       const classify = props.rad;
-      const url = 'https://zgohcl9yg8.execute-api.us-west-2.amazonaws.com/dev/images-bucket-ocr/'+classify+'_'+nameFile;
+      const url = 'https://9zzdictnjb.execute-api.us-west-2.amazonaws.com/dev';
       const res = await Axios.put(url, props.file, {
         headers:{
-          'content-type':'image/jpg',
-          'accept': '*/*'
+          'content-type':'application/json',
+          'filename': nameFile
         }
       });
       console.log(res);
