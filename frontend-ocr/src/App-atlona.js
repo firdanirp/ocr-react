@@ -5,10 +5,16 @@ import React from 'react';
 import ReactiveButton from 'reactive-button'; 
 import Axios from 'axios';
 import FileReader from 'react-file-reader'; 
-import DataTable from 'react-data-table-component';
-import DataTableExtensions from 'react-data-table-component-extensions';
-import 'react-data-table-component-extensions/dist/index.css';
-// import {ExportToCsv} from 'export-to-csv';
+
+import { AgGridReact, AgGridColumn } from '@ag-grid-community/react';
+import { CsvExportModule } from "@ag-grid-community/csv-export";
+import '@ag-grid-community/core/dist/styles/ag-grid.css';
+import '@ag-grid-community/core/dist/styles/ag-theme-alpine.css'; 
+import { ModuleRegistry } from '@ag-grid-community/core';
+import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
+
+// Register the required feature modules with the Grid FOR TABLE
+ModuleRegistry.registerModules([ClientSideRowModelModule,CsvExportModule])
 
 class Upload extends React.Component{
     constructor(props){
@@ -18,18 +24,13 @@ class Upload extends React.Component{
           showUploader:null,
           uploadState:'idle',
           dataResponse:[],
-
-          second:false,
-          btn:undefined,
-          rad:undefined,
-          file:undefined,
-          status:undefined,
-          pdfUrl:undefined
+          fileName:''
         }
 
         this.updateTypeFile = this.updateTypeFile.bind(this);
         this.updateUploadState = this.updateUploadState.bind(this);
         this.updateData = this.updateData.bind(this);
+        this.updateFileName = this.updateFileName.bind(this);
       }
 
       updateTypeFile(first){
@@ -51,17 +52,27 @@ class Upload extends React.Component{
           });
       }
 
+      updateFileName(name){
+        this.setState({
+          fileName:name
+        });
+      }
+
       render(){
           return(
-              <div>
-                <h1>CYP</h1>
+              <div style={{textAlign:'center'}}>
+                <h1>ATLONA</h1>
                 <TypeFile typeFile={this.updateTypeFile}/>
                 {this.state.first === 'pdf' && 
                 <PdfUploader 
                     updateUploadState={this.updateUploadState} 
                     uploadState={this.state.uploadState} 
-                    updateData={this.updateData}/>}
-                {this.state.uploadState === 'success' && <Table dataResponse={this.state.dataResponse}/>}
+                    updateData={this.updateData}
+                    updateFileName={this.updateFileName}/>}
+                {this.state.uploadState === 'success' && 
+                  <Table 
+                    dataResponse={this.state.dataResponse} 
+                    fileName={this.state.fileName}/>}
               </div>
           )
       }
@@ -109,9 +120,11 @@ class PdfUploader extends React.Component{
     async handleFiles(files){
         this.props.updateUploadState('loading');
         let data64 = files.base64;
+        const fileName = files.fileList['0'].name;
+        this.props.updateFileName(fileName);
         data64 = data64.substr(data64.indexOf(',')+1)
-        // URL FOR CYP COMPANY ->LAMBDA PDF HANDLER
-        const response = await Axios.put('https://nlcvy73ry2.execute-api.us-west-2.amazonaws.com/dev',  {
+        // URL FOR ATLONA COMPANY ->LAMBDA PDF HANDLER
+        const response = await Axios.put('https://439elpvibl.execute-api.us-west-2.amazonaws.com/dev',  {
             headers:{
               'Content-Type': 'application/json',
               'filename':files.fileList['0'].name
@@ -145,44 +158,76 @@ class PdfUploader extends React.Component{
 class Table extends React.Component{
     constructor(props){
         super(props);
-        // console.log(this.props.dataResponse);
-    
-        const columns = [
-            {name: 'Sold to Party',selector: row=>row['Sold-to-party']},
-            {name: 'Ship to Party',selector: row=>row['Ship-to-party']},
-            {name: 'Customer Reference',selector: row=>row['CustReference']},
-            {name: 'Request Delivery Date',selector: row=>row['ReqDelivDate']},
-            {name: 'Document Date',selector: row=>row['DocDate']},
-            {name: 'Pricing Date',selector: row=>row['PricingDate']},
-            {name: 'Shipping Type',selector: row=>row['ShippingType']},
-            {name: 'Customer Material Number',selector: row=>row['CustomerMaterialNumb']},
-            {name: 'Order Quantity',selector: row=>row['OrderQuantity']}
-          ];
         const response=this.props.dataResponse;
         const data = Object.values(response);
-        this.tableData = {
-            columns,
-            data,
-          };
+        // console.log(data);
+        
+        this.state = {
+          gridApi:undefined
+        };
 
+        this.state={
+          gridOptions:{
+            rowData:data,
+            columnDefs:[
+              { field: "Sold-to party" },
+              { field: "Ship-to party" },
+              { field: "Cust.Reference" },
+              { field: "Doc.Date" },
+              { field: "PricingDate" },
+              { field: "index"},
+              { field: "item" },
+              { field: "qty" },
+              { field: "etd" },
+              { field: "shipping method" },
+            ],
+            // pagination:true,
+            defaultColDef: {editable: true}
+          }
+        }
+
+        this.onGridReady = this.onGridReady.bind(this);
+        this.clickExport = this.clickExport.bind(this);
+    }
+
+    onGridReady(params){
+      this.setState({gridApi:params.api})
+    }
+
+    clickExport(){
+      let name = this.props.fileName;
+      const nameSplit = name.split('.');
+      const file = nameSplit[0];
+      console.log(file);
+      const params = {
+        fileName:file
+      }
+      this.state.gridApi.exportDataAsCsv(params);
     }
 
     render(){
         return(
-            <div style={{textAlign: "center", margin:'30px'}}>
-                <DataTableExtensions
-                    {...this.tableData}
+            <div className="ag-theme-alpine" style={{textAlign:'left', height:250, width:'70%', position:'absolute', left:'14%'} }>
+              <AgGridReact
+                onGridReady={this.onGridReady}
+                gridOptions={this.state.gridOptions}
                 >
-                    <DataTable
-                        columns={this.columns}
-                        data={this.data}
-                        exportHeaders={true}
-                        defaultSortAsc={false}
-                        highlightOnHover
-                        noHeader
-                        filter={false}
-                    />
-                </DataTableExtensions>
+                <AgGridColumn field='Sold-to party'></AgGridColumn>
+                <AgGridColumn field='Ship-to party'></AgGridColumn>
+                <AgGridColumn field='Cust Reference'></AgGridColumn>
+                <AgGridColumn field='Doc Date'></AgGridColumn>
+                <AgGridColumn field='PricingDate'></AgGridColumn>
+                <AgGridColumn field='index'></AgGridColumn>
+                <AgGridColumn field='item'></AgGridColumn>
+                <AgGridColumn field='qty'></AgGridColumn>
+                <AgGridColumn field='etd'></AgGridColumn>
+                <AgGridColumn field='shipping method'></AgGridColumn> 
+              </AgGridReact> 
+              <div style={{textAlign:'center'}}>
+                <ReactiveButton 
+                  onClick={this.clickExport}
+                  idleText='Export to CSV'/>
+              </div>   
             </div>
         );
     }

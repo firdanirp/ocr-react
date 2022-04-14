@@ -1,10 +1,10 @@
-import './App.css';
 import React from 'react';
 // import { RadioGroup, RadioButton } from 'react-radio-buttons';
 // import ImageUploader from 'react-images-upload';
 import ReactiveButton from 'reactive-button'; 
 import Axios from 'axios';
 import FileReader from 'react-file-reader'; 
+
 import { AgGridReact, AgGridColumn } from '@ag-grid-community/react';
 import { CsvExportModule } from "@ag-grid-community/csv-export";
 import '@ag-grid-community/core/dist/styles/ag-grid.css';
@@ -23,18 +23,13 @@ class Upload extends React.Component{
           showUploader:null,
           uploadState:'idle',
           dataResponse:[],
-
-          second:false,
-          btn:undefined,
-          rad:undefined,
-          file:undefined,
-          status:undefined,
-          pdfUrl:undefined
+          fileName:''
         }
 
         this.updateTypeFile = this.updateTypeFile.bind(this);
         this.updateUploadState = this.updateUploadState.bind(this);
         this.updateData = this.updateData.bind(this);
+        this.updateFileName = this.updateFileName.bind(this);
       }
 
       updateTypeFile(first){
@@ -56,17 +51,27 @@ class Upload extends React.Component{
           });
       }
 
+      updateFileName(name){
+        this.setState({
+          fileName:name
+        });
+      }
+
       render(){
           return(
-              <div>
+              <div style={{textAlign:'center'}}>
                 <h1>CYP</h1>
                 <TypeFile typeFile={this.updateTypeFile}/>
                 {this.state.first === 'pdf' && 
                 <PdfUploader 
                     updateUploadState={this.updateUploadState} 
                     uploadState={this.state.uploadState} 
-                    updateData={this.updateData}/>}
-                {this.state.uploadState === 'success' && <Table dataResponse={this.state.dataResponse}/>}
+                    updateData={this.updateData}
+                    updateFileName={this.updateFileName}/>}
+                {this.state.uploadState === 'success' && 
+                  <Table 
+                    dataResponse={this.state.dataResponse} 
+                    fileName={this.state.fileName}/>}
               </div>
           )
       }
@@ -114,6 +119,8 @@ class PdfUploader extends React.Component{
     async handleFiles(files){
         this.props.updateUploadState('loading');
         let data64 = files.base64;
+        const fileName = files.fileList['0'].name;
+        this.props.updateFileName(fileName);
         data64 = data64.substr(data64.indexOf(',')+1)
         // URL FOR CYP COMPANY ->LAMBDA PDF HANDLER
         const response = await Axios.put('https://nlcvy73ry2.execute-api.us-west-2.amazonaws.com/dev',  {
@@ -150,7 +157,7 @@ class PdfUploader extends React.Component{
 class Table extends React.Component{
     constructor(props){
         super(props);
-        // console.log(this.props.dataResponse);
+        console.log(this.props.fileName);
         const response=this.props.dataResponse;
         const data = Object.values(response);
         // console.log(data);
@@ -187,12 +194,19 @@ class Table extends React.Component{
     }
 
     clickExport(){
-      this.state.gridApi.exportDataAsCsv();
+      let name = this.props.fileName;
+      const nameSplit = name.split('.');
+      const file = nameSplit[0];
+      console.log(file);
+      const params = {
+        fileName:file
+      }
+      this.state.gridApi.exportDataAsCsv(params);
     }
 
     render(){
         return(
-            <div className="ag-theme-alpine" style={{height:250, width:600, position:'absolute', left:'18%', right:'20%'} }>
+            <div className="ag-theme-alpine" style={{height:250, width:'70%', position:'absolute', left:'14%'} }>
               <AgGridReact
                 onGridReady={this.onGridReady}
                 gridOptions={this.state.gridOptions}
@@ -205,12 +219,13 @@ class Table extends React.Component{
                 <AgGridColumn field='PricingDate'></AgGridColumn>
                 <AgGridColumn field='ShippingType'></AgGridColumn>
                 <AgGridColumn field='CustomerMaterialNumb'></AgGridColumn>
-                <AgGridColumn field='OrderQuantity'></AgGridColumn>
-                
+                <AgGridColumn field='OrderQuantity'></AgGridColumn> 
               </AgGridReact> 
-              <ReactiveButton 
-                onClick={this.clickExport}
-                idleText='Export'/>      
+              <div style={{textAlign:'center'}}>
+                <ReactiveButton 
+                  onClick={this.clickExport}
+                  idleText='Export to CSV'/>
+              </div>      
             </div>
         );
     }
